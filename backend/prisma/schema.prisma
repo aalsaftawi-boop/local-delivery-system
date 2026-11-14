@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Role: CUSTOMER | STORE_ADMIN | DRIVER
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  phone        String
+  passwordHash String
+  role         String   @default("CUSTOMER")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store         Store?
+  driverProfile DriverProfile?
+  addresses     Address[]
+  cart          Cart?
+  orders        Order[]              @relation("CustomerOrders")
+  deliveries    Order[]              @relation("DriverOrders")
+  statusChanges OrderStatusHistory[]
+}
+
+model DriverProfile {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicleType String?
+  isAvailable Boolean @default(true)
+}
+
+model Address {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String?
+  city      String
+  street    String
+  building  String?
+  notes     String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  orders Order[]
+}
+
+model Store {
+  id          Int      @id @default(autoincrement())
+  ownerId     Int      @unique
+  owner       User     @relation(fields: [ownerId], references: [id])
+  name        String
+  description String?
+  category    String
+  city        String
+  address     String
+  phone       String?
+  imageUrl    String?
+  isOpen      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  menuItems MenuItem[]
+  orders    Order[]
+  carts     Cart[]
+}
+
+model MenuItem {
+  id          Int      @id @default(autoincrement())
+  storeId     Int
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  price       Float
+  category    String?
+  imageUrl    String?
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+}
+
+model Cart {
+  id         Int      @id @default(autoincrement())
+  customerId Int      @unique
+  customer   User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  storeId    Int?
+  store      Store?   @relation(fields: [storeId], references: [id])
+  updatedAt  DateTime @updatedAt
+
+  items CartItem[]
+}
+
+model CartItem {
+  id         Int      @id @default(autoincrement())
+  cartId     Int
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  menuItemId Int
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  quantity   Int      @default(1)
+
+  @@unique([cartId, menuItemId])
+}
+
+// Status: PENDING | PREPARING | READY | OUT_FOR_DELIVERY | DELIVERED | CANCELLED
+model Order {
+  id         Int     @id @default(autoincrement())
+  customerId Int
+  customer   User    @relation("CustomerOrders", fields: [customerId], references: [id])
+  storeId    Int
+  store      Store   @relation(fields: [storeId], references: [id])
+  driverId   Int?
+  driver     User?   @relation("DriverOrders", fields: [driverId], references: [id])
+  addressId  Int
+  address    Address @relation(fields: [addressId], references: [id])
+
+  status        String @default("PENDING")
+  paymentMethod String @default("CASH_ON_DELIVERY")
+  subtotal      Float
+  deliveryFee   Float  @default(0)
+  total         Float
+  customerNotes String?
+
+  deliveryAddressText String
+  customerPhone       String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items   OrderItem[]
+  history OrderStatusHistory[]
+}
+
+model OrderItem {
+  id            Int       @id @default(autoincrement())
+  orderId       Int
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId    Int?
+  menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  nameSnapshot  String
+  priceSnapshot Float
+  quantity      Int
+}
+
+model OrderStatusHistory {
+  id          Int      @id @default(autoincrement())
+  orderId     Int
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      String
+  changedById Int
+  changedBy   User     @relation(fields: [changedById], references: [id])
+  createdAt   DateTime @default(now())
+}
