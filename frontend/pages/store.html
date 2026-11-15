@@ -9,10 +9,11 @@
 <body class="bg-light">
   <nav class="navbar navbar-dark bg-dark px-3">
     <a class="navbar-brand" href="/index.html">Local Delivery</a>
+    <a class="btn btn-warning btn-sm" href="/pages/cart.html">Cart</a>
   </nav>
 
   <div class="container my-4">
-    <div id="error" class="alert alert-danger d-none"></div>
+    <div id="msg" class="alert d-none"></div>
     <h3 id="name"></h3>
     <p id="info" class="text-muted"></p>
     <div id="menu" class="row g-3"></div>
@@ -23,9 +24,23 @@
     function escapeHtml(s) {
       return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
+    function show(text, type = 'danger') {
+      const box = document.getElementById('msg');
+      box.className = `alert alert-${type}`;
+      box.textContent = text;
+    }
+
+    async function addToCart(menuItemId) {
+      const user = getUser();
+      if (!user) return (window.location.href = '/pages/login.html');
+      if (user.role !== 'CUSTOMER') return show('Only customers can order.');
+      try {
+        await api('/cart/items', { method: 'POST', body: JSON.stringify({ menuItemId, quantity: 1 }) });
+        show('Added to cart!', 'success');
+      } catch (e) { show(e.message); }
+    }
 
     const id = new URLSearchParams(location.search).get('id');
-
     api('/stores/' + id).then((s) => {
       document.getElementById('name').textContent = s.name;
       document.getElementById('info').textContent = `${s.category} · ${s.city} · ${s.address}`;
@@ -37,13 +52,12 @@
               <p class="text-muted small mb-1">${escapeHtml(i.description || '')}</p>
               <strong>${i.price.toFixed(2)}</strong>
             </div>
+            <div class="card-footer bg-white border-0">
+              <button class="btn btn-sm btn-primary" onclick="addToCart(${i.id})">Add to cart</button>
+            </div>
           </div>
         </div>`).join('') || '<p class="text-muted">No items available.</p>';
-    }).catch((e) => {
-      const box = document.getElementById('error');
-      box.textContent = e.message;
-      box.classList.remove('d-none');
-    });
+    }).catch((e) => show(e.message));
   </script>
 </body>
 </html>
